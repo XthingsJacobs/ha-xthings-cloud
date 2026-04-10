@@ -240,3 +240,22 @@ class XthingsCloudApiClient:
     async def async_get_frp_config(self, client_id: str) -> dict[str, Any]:
         """Get FRP remote access configuration."""
         return await self._request(API_FRP_HTTP, json={"uuid": client_id})
+
+    # ---- Utility ----
+
+    async def async_get_snapshot(self, url: str) -> bytes | None:
+        """Fetch image bytes from a snapshot URL.
+
+        Args:
+            url: The snapshot image URL (e.g. from device status).
+
+        Returns:
+            Image bytes, or None on failure.
+        """
+        try:
+            resp = await self._session.get(url)
+            if resp.status == 200:
+                return await resp.read()
+        except Exception:  # noqa: BLE001
+            _LOGGER.debug("Failed to fetch snapshot from %s", url)
+        return None
