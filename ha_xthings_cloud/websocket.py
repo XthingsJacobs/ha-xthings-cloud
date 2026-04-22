@@ -186,8 +186,6 @@ class XthingsCloudWebSocket:
                 is_locked = status["is_locked"]
                 status["locked"] = is_locked == 2
                 status["jammed"] = is_locked == 3
-            if "battery_percent" in status:
-                status["battery"] = status["battery_percent"]
             self._on_device_status(device_uuid, status)
 
     def _handle_device_photo(self, data: Any) -> None:
