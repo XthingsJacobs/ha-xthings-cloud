@@ -108,32 +108,26 @@ class XthingsCloudApiClient:
         email: str,
         password: str,
         client_id: str | None = None,
-        verification_code: str | None = None,
     ) -> dict[str, Any]:
         """Login and obtain token.
 
-        Returns {"2fa": int} if 2FA verification is required.
-        Returns {"token": str, "refresh_token": str, "client_id": str} on success.
+        Returns {"token": str, "refresh_token": str, "client_id": str, "user_id": str} on success.
         """
         payload: dict[str, Any] = {"email": email, "password": password}
         if client_id:
             payload["client_id"] = client_id
-        if verification_code:
-            payload["code"] = verification_code
 
         data = await self._request(
             API_LOGIN, json=payload,
             headers={"Content-Type": "application/json"},
         )
 
-        if data.get("2fa"):
-            return {"2fa": data["2fa"]}
-
         self._token = data["token"]
         return {
             "token": data["token"],
             "refresh_token": data.get("refresh_token", ""),
             "client_id": data.get("client_id", ""),
+            "user_id": data["user_id"],
         }
 
     async def async_refresh_token(self, refresh_token: str) -> dict[str, Any]:
