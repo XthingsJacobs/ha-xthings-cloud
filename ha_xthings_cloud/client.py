@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import logging
+import time
 from typing import Any
 
 import aiohttp
+import jwt
 
 from .const import (
     API_BRITE_BRIGHTNESS,
@@ -102,6 +104,18 @@ class XthingsCloudApiClient:
         raise XthingsCloudApiError(f"API error (code={code})", code=code)
 
     # ---- Auth ----
+
+    def is_token_expired(self) -> bool:
+        """Check if the current token is expired or about to expire (within 60s)."""
+        if not self._token:
+            return True
+        try:
+            payload = jwt.decode(
+                self._token, options={"verify_signature": False}
+            )
+            return payload.get("exp", 0) < time.time() + 60
+        except jwt.DecodeError:
+            return True
 
     async def async_login(
         self,
