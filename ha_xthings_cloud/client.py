@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import json
 import logging
 import time
 from typing import Any
@@ -30,6 +32,7 @@ from .const import (
     AUTH_ERROR_CODES,
 )
 from .exceptions import XthingsCloudApiError, XthingsCloudAuthError
+from .bulb import SUPPORTED_MODELS, NativeBulbRoute
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -167,6 +170,62 @@ class XthingsCloudApiClient:
     async def async_get_device_status(self, device_id: str) -> dict[str, Any]:
         """Get single device status."""
         return await self._request(API_DEVICE_STATUS, json={"id": device_id})
+
+    async def async_get_native_bulb_routes(self) -> dict[str, NativeBulbRoute]:
+        """Discover supported bulb routing via the authenticated app API.
+
+        Return command addresses and group response routes; discard other metadata.
+        """
+        async def request(path: str, payload: dict[str, Any]) -> list[dict[str, Any]]:
+            try:
+                response = await self._session.request(
+                    "POST", f"https://cloud.u-tec.com/app/{path}",
+                    data={"token": self._token,
+                          "data": json.dumps({**payload, "timestamp": str(time.time())})},
+                    timeout=aiohttp.ClientTimeout(total=15), allow_redirects=False,
+                )
+                response.raise_for_status()
+                result = await response.json()
+            except (aiohttp.ClientError, asyncio.TimeoutError, ValueError) as err:
+                raise XthingsCloudApiError("Native device discovery failed") from err
+            if not isinstance(result, dict):
+                raise XthingsCloudApiError("Invalid native discovery response")
+            code = result.get("code")
+            if code in AUTH_ERROR_CODES:
+                raise XthingsCloudAuthError("Native discovery authentication failed", code)
+            return entries(result.get("data") if code == 200 else None)
+
+        def entries(value: Any) -> list[dict[str, Any]]:
+            if not isinstance(value, list) or not all(
+                isinstance(v, dict) for v in value
+            ):
+                raise XthingsCloudApiError("Invalid native discovery response")
+            return value
+
+        def identifier(
+            item: dict[str, Any], key: str, kinds: tuple[type, ...]
+        ) -> Any:
+            value = item.get(key)
+            if type(value) not in kinds or value in ("", 0):
+                raise XthingsCloudApiError("Invalid native discovery response")
+            return value
+
+        routes = {}
+        for address in await request("address", {}):
+            address_id = identifier(address, "id", (int,))
+            for room in await request("room", {"id": address_id}):
+                room_id = identifier(room, "id", (int, str))
+                for device in await request("device/list", {"room_id": room_id}):
+                    if device.get("model") in SUPPORTED_MODELS:
+                        uuid = identifier(device, "uuid", (str,))
+                        routes[uuid] = NativeBulbRoute(address_id)
+                    elif device.get("entry_type") == "Britegroup":
+                        group_id = identifier(device, "uuid", (str,))
+                        for bulb in entries(device.get("lights", [])):
+                            if bulb.get("model") in SUPPORTED_MODELS:
+                                uuid = identifier(bulb, "uuid", (str,))
+                                routes[uuid] = NativeBulbRoute(address_id, group_id)
+        return routes
 
     # ---- Switch ----
 
