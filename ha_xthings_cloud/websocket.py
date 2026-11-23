@@ -98,9 +98,10 @@ class XthingsCloudWebSocket:
         _LOGGER.info("WebSocket connected")
         self._reconnect_delay = RECONNECT_MIN_DELAY
 
-        # Authenticate
+        # Authenticate without logging the credential itself.
+        login_message = {"cmd": "login", "data": {"x-token": "<redacted>"}}
         await self._ws.send_json({"cmd": "login", "data": {"x-token": self._token}})
-        _LOGGER.info("WebSocket login sent")
+        _LOGGER.debug("WebSocket send: %s", login_message)
         self._ping_task = asyncio.create_task(self._async_ping_loop())
 
         try:
@@ -137,8 +138,9 @@ class XthingsCloudWebSocket:
             while self._ws and not self._ws.closed:
                 await asyncio.sleep(55)
                 if self._ws and not self._ws.closed:
-                    await self._ws.send_json({"cmd": "ping"})
-                    _LOGGER.debug("WebSocket ping sent")
+                    ping_message = {"cmd": "ping"}
+                    await self._ws.send_json(ping_message)
+                    _LOGGER.debug("WebSocket send: %s", ping_message)
         except asyncio.CancelledError:
             pass
         except aiohttp.ClientError as err:

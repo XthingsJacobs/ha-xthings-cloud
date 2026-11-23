@@ -10,6 +10,7 @@ import aiohttp
 import jwt
 
 from .const import (
+    API_BIND,
     API_BRITE_BRIGHTNESS,
     API_BRITE_COLOR,
     API_BRITE_OFF,
@@ -27,11 +28,25 @@ from .const import (
     API_SWITCH_BRIGHTNESS,
     API_SWITCH_OFF,
     API_SWITCH_ON,
+    API_UNBIND,
     AUTH_ERROR_CODES,
 )
 from .exceptions import XthingsCloudApiError, XthingsCloudAuthError
 
 _LOGGER = logging.getLogger(__name__)
+_SENSITIVE_KEYS = {"password", "token", "refresh_token", "x-token"}
+
+
+def _redact_sensitive(value: Any) -> Any:
+    """Redact credentials before writing request data to logs."""
+    if isinstance(value, dict):
+        return {
+            key: "<redacted>" if key in _SENSITIVE_KEYS else _redact_sensitive(item)
+            for key, item in value.items()
+        }
+    if isinstance(value, list):
+        return [_redact_sensitive(item) for item in value]
+    return value
 
 
 class XthingsCloudApiClient:
@@ -81,7 +96,7 @@ class XthingsCloudApiClient:
         if headers is None:
             headers = self._headers()
 
-        _LOGGER.debug("Request: POST %s, body=%s", url, json)
+        _LOGGER.debug("Request: POST %s, body=%s", url, _redact_sensitive(json))
 
         try:
             resp = await self._session.request("POST", url, json=json, headers=headers)
@@ -93,7 +108,12 @@ class XthingsCloudApiClient:
         code = result.get("code")
         data = result.get("data", {})
 
-        _LOGGER.debug("Response: POST %s, code=%s", url, code)
+        _LOGGER.debug(
+            "Response: POST %s, code=%s, body=%s",
+            url,
+            code,
+            _redact_sensitive(result),
+        )
 
         if code == 200:
             return data
@@ -242,6 +262,16 @@ class XthingsCloudApiClient:
     async def async_get_camera_webrtc(self, device_id: str) -> dict[str, Any]:
         """Get camera KVS WebRTC credentials."""
         return await self._request(API_CAMERA_WEBRTC, json={"uuid": device_id})
+
+    async def async_bind(self, uuid: str, version: str, model: str) -> dict[str, Any]:
+        """Bind a Home Assistant instance to the cloud account."""
+        return await self._request(
+            API_BIND, json={"uuid": uuid, "version": version, "model": model}
+        )
+
+    async def async_unbind(self, uuid: str) -> dict[str, Any]:
+        """Unbind a Home Assistant instance from the cloud account."""
+        return await self._request(API_UNBIND, json={"uuid": uuid})
 
     # ---- FRP Remote Access ----
 
