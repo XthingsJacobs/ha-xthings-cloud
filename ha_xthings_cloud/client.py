@@ -25,7 +25,7 @@ from .const import (
     API_PLUG_OFF,
     API_PLUG_ON,
     API_REFRESH_TOKEN,
-    API_SSO_VERIFY,
+    API_SSO_EXCHANGE,
     API_SWITCH_BRIGHTNESS,
     API_SWITCH_OFF,
     API_SWITCH_ON,
@@ -186,13 +186,13 @@ class XthingsCloudApiClient:
             "refresh_token": data.get("refresh_token", ""),
         }
 
-    async def async_verify_sso_ticket(
-        self, ticket: str, instance_id: str, nonce: str
+    async def async_exchange_sso_code(
+        self, code: str, instance_id: str
     ) -> dict[str, Any]:
-        """Verify a short-lived, single-use cloud SSO ticket."""
+        """Exchange a one-time Cloud SSO code for the bound user."""
         return await self._request(
-            API_SSO_VERIFY,
-            json={"ticket": ticket, "instance_id": instance_id, "nonce": nonce},
+            API_SSO_EXCHANGE,
+            json={"code": code, "instance_id": instance_id},
         )
 
     # ---- Devices ----
@@ -281,10 +281,17 @@ class XthingsCloudApiClient:
         """Get camera KVS WebRTC credentials."""
         return await self._request(API_CAMERA_WEBRTC, json={"uuid": device_id})
 
-    async def async_bind(self, uuid: str, version: str, model: str) -> dict[str, Any]:
+    async def async_bind(
+        self,
+        uuid: str,
+        version: str = "",
+        model: str = "",
+        sso_ha_user_id: str = "",
+    ) -> dict[str, Any]:
         """Bind a Home Assistant instance to the cloud account."""
         return await self._request(
-            API_BIND, json={"uuid": uuid, "version": version, "model": model}
+            API_BIND,
+            json={"instance_id": uuid, "sso_ha_user_id": sso_ha_user_id},
         )
 
     async def async_unbind(self, uuid: str) -> dict[str, Any]:

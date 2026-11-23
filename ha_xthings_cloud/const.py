@@ -33,9 +33,9 @@ API_LOCK_UNLOCK = f"{API_BASE_URL}/device/lock/command/unlock"
 API_CAMERA_WEBRTC = f"{API_BASE_URL}/device/camera/command/webrtc"
 
 # Home Assistant binding
-API_BIND = f"{API_BASE_URL}/bind"
+API_BIND = f"{API_BASE_URL}/sso/bind"
 API_UNBIND = f"{API_BASE_URL}/unbind"
-API_SSO_VERIFY = f"{API_BASE_URL}/sso/verify"
+API_SSO_EXCHANGE = f"{API_BASE_URL}/sso/exchange"
 
 # FRP remote access
 API_FRP_HTTP = f"{API_BASE_URL}/frp/get/http"
