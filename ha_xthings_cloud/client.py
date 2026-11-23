@@ -25,6 +25,7 @@ from .const import (
     API_PLUG_OFF,
     API_PLUG_ON,
     API_REFRESH_TOKEN,
+    API_SSO_VERIFY,
     API_SWITCH_BRIGHTNESS,
     API_SWITCH_OFF,
     API_SWITCH_ON,
@@ -34,7 +35,16 @@ from .const import (
 from .exceptions import XthingsCloudApiError, XthingsCloudAuthError
 
 _LOGGER = logging.getLogger(__name__)
-_SENSITIVE_KEYS = {"password", "token", "refresh_token", "x-token"}
+_SENSITIVE_KEYS = {
+    "password",
+    "token",
+    "refresh_token",
+    "x-token",
+    "ticket",
+    "nonce",
+    "auth_token",
+    "metadatas_jwt",
+}
 
 
 def _redact_sensitive(value: Any) -> Any:
@@ -130,9 +140,7 @@ class XthingsCloudApiClient:
         if not self._token:
             return True
         try:
-            payload = jwt.decode(
-                self._token, options={"verify_signature": False}
-            )
+            payload = jwt.decode(self._token, options={"verify_signature": False})
             return payload.get("exp", 0) < time.time() + 60
         except jwt.DecodeError:
             return True
@@ -152,7 +160,8 @@ class XthingsCloudApiClient:
             payload["client_id"] = client_id
 
         data = await self._request(
-            API_LOGIN, json=payload,
+            API_LOGIN,
+            json=payload,
             headers={"Content-Type": "application/json"},
         )
 
@@ -176,6 +185,15 @@ class XthingsCloudApiClient:
             "token": data["token"],
             "refresh_token": data.get("refresh_token", ""),
         }
+
+    async def async_verify_sso_ticket(
+        self, ticket: str, instance_id: str, nonce: str
+    ) -> dict[str, Any]:
+        """Verify a short-lived, single-use cloud SSO ticket."""
+        return await self._request(
+            API_SSO_VERIFY,
+            json={"ticket": ticket, "instance_id": instance_id, "nonce": nonce},
+        )
 
     # ---- Devices ----
 

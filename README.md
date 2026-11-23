@@ -92,6 +92,20 @@ Each method returns the response envelope's `data` value on success. The server 
 
 This package only handles the cloud API calls. Downloading FRP binaries, generating TOML configuration, and starting or stopping the FRP process belong to the Home Assistant integration, not this client library. In the current integration, binding succeeds before FRP setup proceeds; a normal restart or reload with the option enabled repeats binding and FRP setup, while an unload only stops the local tunnel and does not unbind the instance.
 
+### SSO Ticket Verification
+
+`async_verify_sso_ticket` verifies a short-lived, single-use ticket issued by Xthings Cloud for the same HA instance. The integration sends the ticket and a browser transaction nonce to `POST https://api.cloud.xthings.com/ha/sso/verify` using the bound account token:
+
+```json
+{
+  "ticket": "<one-time-ticket>",
+  "instance_id": "<ha-instance-id>",
+  "nonce": "<browser-transaction-nonce>"
+}
+```
+
+The successful `data` response must contain `ticket_id`, `xthings_user_id`, `instance_id`, `nonce`, and numeric `expires_at`. The service must reject expired or previously redeemed tickets and must return the same instance ID and nonce. The HA integration additionally compares `xthings_user_id` with the configured Xthings account before creating a same-origin browser session. Tickets and nonces are redacted from client debug logs.
+
 ### WebSocket (Real-time Push)
 
 `async_start()` starts a background connection loop and returns immediately. Keep the session open until `async_stop()` completes. The status callback is synchronous; the token-expired callback is awaited.
