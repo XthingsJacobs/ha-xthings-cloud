@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import logging
 import time
+from pathlib import Path
 from typing import Any
 
 import aiohttp
@@ -33,6 +34,7 @@ from .const import (
     AUTH_ERROR_CODES,
 )
 from .exceptions import XthingsCloudApiError, XthingsCloudAuthError
+from .frp import async_ensure_frpc, build_frpc_toml
 
 _LOGGER = logging.getLogger(__name__)
 _SENSITIVE_KEYS = {
@@ -303,6 +305,22 @@ class XthingsCloudApiClient:
     async def async_get_frp_config(self, client_id: str) -> dict[str, Any]:
         """Get FRP remote access configuration."""
         return await self._request(API_FRP_HTTP, json={"uuid": client_id})
+
+    async def async_ensure_frpc(self, save_dir: str) -> str | None:
+        """Ensure the current platform's FRPC binary is available and current."""
+        path = await async_ensure_frpc(self._session, save_dir)
+        return str(path) if path else None
+
+    async def async_create_frpc_config(
+        self, client_id: str, save_path: str, ha_port: int = 8123
+    ) -> dict[str, Any]:
+        """Fetch FRP settings, write an FRPC TOML file, and return the settings."""
+        data = await self.async_get_frp_config(client_id)
+        path = Path(save_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(build_frpc_toml(data, ha_port, client_id), encoding="utf-8")
+        _LOGGER.info("Wrote frpc config to %s", path)
+        return data
 
     # ---- Utility ----
 
