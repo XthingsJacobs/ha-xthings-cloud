@@ -3,11 +3,8 @@
 from __future__ import annotations
 
 import asyncio
-import logging
 import stat
 from pathlib import Path
-
-_LOGGER = logging.getLogger(__name__)
 
 
 def _ensure_executable(path: Path) -> None:
@@ -27,18 +24,13 @@ async def async_verify_frpc_config(frpc_path: str | Path, config_path: str | Pat
             "verify",
             "-c",
             str(config),
-            stdout=asyncio.subprocess.PIPE,
-            stderr=asyncio.subprocess.STDOUT,
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.DEVNULL,
         )
-        output, _ = await process.communicate()
-    except OSError as err:
-        _LOGGER.error("Failed to verify frpc config: %s", err)
+        await process.wait()
+    except OSError:
         return False
-    if process.returncode:
-        details = output.decode(errors="replace").strip()
-        _LOGGER.error("Invalid frpc config (exit %s): %s", process.returncode, details)
-        return False
-    return True
+    return process.returncode == 0
 
 
 async def async_start_frpc(
@@ -47,10 +39,9 @@ async def async_start_frpc(
     """Validate and start FRPC without forwarding its output to the caller."""
     binary = Path(frpc_path)
     config = Path(config_path)
-    if not config.exists():
-        _LOGGER.error("frpc config not found: %s", config)
+    if not await asyncio.to_thread(config.exists):
         return None
-    _ensure_executable(binary)
+    await asyncio.to_thread(_ensure_executable, binary)
     if not await async_verify_frpc_config(binary, config):
         return None
     try:
@@ -61,10 +52,8 @@ async def async_start_frpc(
             stdout=asyncio.subprocess.DEVNULL,
             stderr=asyncio.subprocess.DEVNULL,
         )
-    except OSError as err:
-        _LOGGER.error("Failed to start frpc: %s", err)
+    except OSError:
         return None
-    _LOGGER.info("frpc started (pid=%s)", process.pid)
     return process
 
 

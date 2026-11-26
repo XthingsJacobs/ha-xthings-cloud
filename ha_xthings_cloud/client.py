@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 import time
 from pathlib import Path
@@ -317,9 +318,9 @@ class XthingsCloudApiClient:
         """Fetch FRP settings, write an FRPC TOML file, and return the settings."""
         data = await self.async_get_frp_config(client_id)
         path = Path(save_path)
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(build_frpc_toml(data, ha_port, client_id), encoding="utf-8")
-        _LOGGER.info("Wrote frpc config to %s", path)
+        content = build_frpc_toml(data, ha_port, client_id)
+        await asyncio.to_thread(path.parent.mkdir, parents=True, exist_ok=True)
+        await asyncio.to_thread(path.write_text, content, encoding="utf-8")
         return data
 
     # ---- Utility ----
